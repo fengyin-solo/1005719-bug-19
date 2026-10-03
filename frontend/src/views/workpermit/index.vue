@@ -3,10 +3,9 @@
     <header class="page-head">
       <div>
         <h2>工作票许可管理</h2>
-        <p class="page-desc">维护工作票，围绕工作票号、工作任务、所属变电站、停电范围做登记、筛选与状态流转。</p>
+        <p class="page-desc">待办理清单由变电站退役底稿驱动：已停用站的票自动撤下；退役办理中的站不予新许可。</p>
       </div>
       <div class="page-actions">
-        <button class="btn primary" type="button" @click="openCreate">登记工作票</button>
         <button class="btn" type="button" @click="exportRows">导出工作票许可清单</button>
       </div>
     </header>
@@ -18,11 +17,18 @@
       </article>
     </div>
 
-    <p class="status-legend">
-      <span v-for="item in statusSummary" :key="item.status" class="legend-item">
-        {{ item.status }}：{{ item.count }}
-      </span>
-    </p>
+    <div class="scope-tabs" role="tablist">
+      <button
+        v-for="tab in scopeTabs"
+        :key="tab.key"
+        class="scope-tab"
+        :class="{ active: scope === tab.key }"
+        type="button"
+        @click="switchScope(tab.key)"
+      >
+        {{ tab.label }}（{{ tab.count }}）
+      </button>
+    </div>
 
     <form class="filter-bar" @submit.prevent="reload">
       <label v-for="field in filterFields" :key="field" class="filter-item">
@@ -43,11 +49,11 @@
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+          <td v-for="column in columns" :key="column">{{ row[column] || '—' }}</td>
           <td>{{ row.status }}</td>
           <td class="row-actions">
             <button
-              v-for="action in actions"
+              v-for="action in permitActions(row)"
               :key="action"
               class="link"
               type="button"
@@ -58,14 +64,14 @@
           </td>
         </tr>
         <tr v-if="!rows.length">
-          <td :colspan="columns.length + 2" class="empty-state">暂无工作票许可数据，可先登记工作票</td>
+          <td :colspan="columns.length + 2" class="empty-state">{{ emptyText }}</td>
         </tr>
       </tbody>
     </table>
 
     <footer class="page-foot">
-      <span>共 {{ total }} 条工作票许可记录</span>
-      <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
+      <span>共 {{ rows.length }} 条记录</span>
+      <span v-if="message" :class="messageOk ? 'ok-text' : 'error-text'">{{ message }}</span>
     </footer>
   </section>
 </template>
@@ -73,31 +79,75 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import { downloadEntries, moduleMeta } from '@/api/local-service'
 import {
-  downloadEntries,
-  listEntries,
-  moduleMeta,
-  runAction as applyAction,
-} from '@/api/local-service'
+  listPermits,
+  permitActions,
+  permitCounts,
+  runPermitAction,
+  type PermitScope,
+} from '@/api/workpermit-service'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('workpermit')
-const columns = ["工作票号", "工作任务", "所属变电站", "停电范围", "工作负责人", "许可时间", "终结时间", "许可状态"]
-const actions = ["签发许可", "办理终结", "作废工作票"]
-const statuses = ["待签发", "已许可", "已终结", "已作废"]
-const stats = [{"label": "待签发工作票", "value": 0}, {"label": "已许可工作票", "value": 0}, {"label": "已终结工作票", "value": 0}]
+const columns = ['工作票号', '工作任务', '所属变电站', '停电范围', '工作负责人', '许可时间', '终结时间', '许可状态']
+const filterFields = ['工作票号', '工作任务', '所属变电站']
 
 const rows = ref<EntryRow[]>([])
-const total = ref(0)
-const errorMessage = ref('')
+const message = ref('')
+const messageOk = ref(false)
 const filters = ref<Record<string, string>>({})
-const filterFields = columns.slice(0, 3)
-const statusSummary = computed(() =>
-  statuses.map((status: string) => ({
-    status,
-    count: rows.value.filter((row) => String(row.status) === status).length,
-  })),
-)
+const scope = ref<PermitScope>('pending')
+
+const stats = ref([
+  { label: '待办理工作票', value: 0 },
+  { label: '已许可工作票', value: 0 },
+  { label: '已终结/作废', value: 0 },
+])
+
+const scopeTabs = ref<{ key: PermitScope; label: string; count: number }[]>([
+  { key: 'pending', label: '待办理', count: 0 },
+  { key: 'issued', label: '已许可', count: 0 },
+  { key: 'closed', label: '已终结/作废', count: 0 },
+  { key: 'all', label: '全部', count: 0 },
+])
+
+const emptyText = computed(() => {
+  if (scope.value === 'pending') {
+    return '待办理清单为空：在役站没有待签发工作票，已退役站的票已随退役撤下并作废'
+  }
+  return '暂无工作票许可数据'
+})
+
+function refreshCounters() {
+  const counts = permitCounts()
+  stats.value = [
+    { label: '待办理工作票', value: counts.pending },
+    { label: '已许可工作票', value: counts.issued },
+    { label: '已终结/作废', value: counts.closed },
+  ]
+  scopeTabs.value = scopeTabs.value.map((tab) => ({
+    ...tab,
+    count: tab.key === 'pending'
+      ? counts.pending
+      : tab.key === 'issued'
+        ? counts.issued
+        : tab.key === 'closed'
+          ? counts.closed
+          : counts.all,
+  }))
+}
+
+function reload() {
+  message.value = ''
+  rows.value = listPermits(scope.value, filters.value)
+  refreshCounters()
+}
+
+function switchScope(next: PermitScope) {
+  scope.value = next
+  reload()
+}
 
 function resetFilters() {
   filters.value = {}
@@ -108,29 +158,11 @@ function exportRows() {
   downloadEntries(meta.key)
 }
 
-function openCreate() {
-  errorMessage.value = '工作票登记入口尚未接入审批流'
-}
-
 function runAction(action: string, row: EntryRow) {
-  errorMessage.value = ''
-  const result = applyAction(meta.key, Number(row.id), action)
-  if (!result.ok) {
-    errorMessage.value = result.message
-    return
-  }
+  const result = runPermitAction(Number(row.id), action)
   reload()
-}
-
-function reload() {
-  errorMessage.value = ''
-  try {
-    const payload = listEntries(meta.key, filters.value)
-    rows.value = payload.items
-    total.value = payload.total
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '工作票许可列表读取失败'
-  }
+  message.value = result.message
+  messageOk.value = result.ok
 }
 
 onMounted(reload)

@@ -35,3 +35,31 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .error-text { color: #b42318; }
 .status-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; font-size: 12px; color: var(--muted); }
 .legend-item { background: #eef2f7; border-radius: 999px; padding: 2px 10px; }
+.ok-text { color: #067647; }
+
+.scope-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.scope-tab { border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer; color: #334155; }
+.scope-tab.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+.page-foot--paged { align-items: center; }
+.pager { display: flex; gap: 6px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.modal-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 24px; }
+.modal { background: #fff; border-radius: 10px; padding: 20px 22px; width: 520px; max-width: 100%; max-height: 88vh; overflow: auto; box-shadow: 0 12px 32px rgba(15, 23, 42, .2); }
+.modal--wide { width: 760px; }
+.modal h3 { margin: 0 0 8px; font-size: 16px; }
+.modal-hint { font-size: 12px; color: var(--muted); margin: 0 0 14px; line-height: 1.6; }
+.modal-form { display: flex; flex-direction: column; gap: 10px; }
+.form-item span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+.form-item em { color: #b42318; font-style: normal; margin-left: 2px; }
+.form-item input { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 13px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+
+.detail-table th { width: 180px; background: #f8fafc; }
+.overridden-tag { display: inline-block; margin-left: 8px; font-size: 12px; color: #b54708; background: #fef3c7; border-radius: 4px; padding: 0 6px; }
+.detail-sub { font-size: 14px; margin: 16px 0 8px; }
+.step-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.step-item { display: flex; justify-content: space-between; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; color: var(--muted); }
+.step-item.done { border-color: #12b76a; background: #ecfdf3; color: #067647; }
+.step-time { font-variant-numeric: tabular-nums; }

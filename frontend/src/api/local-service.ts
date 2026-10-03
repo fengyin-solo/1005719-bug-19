@@ -1,5 +1,7 @@
 import { MODULE_BY_KEY } from '@/data/modules'
 import { allRows, listRows, resetRows, saveRows } from '@/data/local-store'
+import { stationSummary } from '@/api/substation-service'
+import { permitCounts } from '@/api/workpermit-service'
 import type { ActionResult, EntryRow, ModuleMeta, OverviewResult, PageResult } from '@/data/types'
 
 // 会写进数据的「往回走」动作：命中就把这条记录标成异常态，看板上能一眼看出来。
@@ -95,7 +97,15 @@ export function loadOverview(): OverviewResult {
       abnormal: entries.filter((row) => row.abnormal).length,
     }
   })
+  // 在运站数、停用站数、退役办理中：全部按变电站同一份底稿重算，不另存快照。
+  const stations = stationSummary()
+  // 待办理工作票：由退役落定结果驱动，已停用站的票不计入。
+  const permits = permitCounts()
   const cards = [
+    { label: '在运站数', value: stations.inService },
+    { label: '停用站数', value: stations.retired },
+    { label: '退役办理中', value: stations.decommissioning },
+    { label: '待办理工作票', value: permits.pending },
     { label: '业务模块', value: modules.length },
     { label: '登记总量', value: modules.reduce((sum, item) => sum + item.created, 0) },
     { label: '待处理', value: modules.reduce((sum, item) => sum + item.pending, 0) },
