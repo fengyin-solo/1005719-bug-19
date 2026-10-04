@@ -3,7 +3,7 @@
     <header class="page-head">
       <div>
         <h2>工作票许可管理</h2>
-        <p class="page-desc">维护工作票，围绕工作票号、工作任务、所属变电站、停电范围做登记、筛选与状态流转。</p>
+        <p class="page-desc">维护工作票，围绕工作票号、工作任务、所属变电站、停电范围做登记、筛选与状态流转。变电站退役落定后，指向该站的待办理工作票自动作废，从待办理清单撤下。</p>
       </div>
       <div class="page-actions">
         <button class="btn primary" type="button" @click="openCreate">登记工作票</button>
@@ -44,7 +44,7 @@
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
-          <td>{{ row.status }}</td>
+          <td :title="row.作废原因 ? String(row.作废原因) : ''">{{ row.status }}</td>
           <td class="row-actions">
             <button
               v-for="action in actions"
@@ -77,6 +77,7 @@ import {
   downloadEntries,
   listEntries,
   moduleMeta,
+  pendingPermitCount,
   runAction as applyAction,
 } from '@/api/local-service'
 import type { EntryRow } from '@/data/types'
@@ -85,13 +86,18 @@ const meta = moduleMeta('workpermit')
 const columns = ["工作票号", "工作任务", "所属变电站", "停电范围", "工作负责人", "许可时间", "终结时间", "许可状态"]
 const actions = ["签发许可", "办理终结", "作废工作票"]
 const statuses = ["待签发", "已许可", "已终结", "已作废"]
-const stats = [{"label": "待签发工作票", "value": 0}, {"label": "已许可工作票", "value": 0}, {"label": "已终结工作票", "value": 0}]
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const stats = computed(() => [
+  // 待办理清单由退役结果驱动：退役站的待签发票已自动作废，不计入待办理。
+  { label: "待签发工作票（待办理）", value: pendingPermitCount() },
+  { label: "已许可工作票", value: rows.value.filter((row) => String(row.status) === "已许可").length },
+  { label: "已终结工作票", value: rows.value.filter((row) => String(row.status) === "已终结").length },
+])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
